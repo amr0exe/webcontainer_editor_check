@@ -20,6 +20,12 @@ export default function App() {
 	const [code, setCode] = useState("");
 	const [webcontainerInstance, setWebcontainerInstance] = useState(null);
 
+	// curl
+	const [method, setMethod] = useState("GET");
+	const [header, setHeader] = useState("");
+	const [data, setData] = useState("");
+	const [resp, setResp] = useState("");
+
 	const bootWC = useCallback(async () => {
 		const webcontainer = await WebContainer.boot({
 			coep: "credentialless",
@@ -97,6 +103,22 @@ export default function App() {
 		await webcontainerInstance.spawn("npm", ["start"]);
 	};
 
+	// curl-automation
+	const curlAutomate = async () => {
+		// accepted method
+		// GET POST PUT DELETE
+		const process = await webcontainerInstance.spawn("curl", [`${url}`]);
+
+		// pipe curl to console
+		await process.output.pipeTo(
+			new WritableStream({
+				write(chunk) {
+					setResp(chunk);
+				},
+			}),
+		);
+	};
+
 	// for booting-up webcontainer
 	useEffect(() => {
 		if (bootedRef.current) return;
@@ -115,74 +137,42 @@ export default function App() {
 		return () => clearInterval(interval);
 	}, [webcontainerInstance]);
 
-	// for websocket-proxy soln
-	useEffect(() => {
-		const socket = new WebSocket("ws://localhost:9000");
-
-		socket.onmessage = async (event) => {
-			const { id, method, path, body } = JSON.parse(event.data);
-
-			console.log(method, path, body);
-			const options = {
-				method,
-				headers: { "Content-Type": "application/json" },
-				// mode: "no-cors",
-			};
-			if (method !== "GET") {
-				options.body = body ? JSON.stringify(body) : "undefined";
-			}
-
-			try {
-				const res = await fetch(`${url}${path}`, options);
-				// const res = await fetch(
-				// 	`http://localhost:3000${path}`,
-				// 	options,
-				// );
-				console.log(`${url}${path}`);
-				const res_body = await res.text();
-				socket.send(JSON.stringify({ id, res_body }));
-			} catch (e) {
-				console.log("Error fetching respone: ", e);
-			}
-		};
-	}, [url]);
-
 	return (
 		<div className="h-screen flex flex-col">
 			<div className="flex flex-1 overflow-hidden">
-				{/* File Tree Sidebar */}
-				<div className="w-1/4 bg-gray-100 p-4 overflow-auto border-r flex flex-col">
-					<div className="flex flex-col">
-						<button
-							onClick={startDevServer}
-							className="px-6 py-2 bg-black text-white rounded-lg mb-4 cursor-pointer"
+				{/* File Explorer - 20% */}
+				<div className="w-1/5 border-r bg-gray-100 p-4 overflow-auto flex flex-col">
+					{/* Run-the-Program */}
+					<button
+						className="px-6 py-2 bg-black text-white rounded-lg cursor-pointer active:opacity-70 active:scale-95 transition duration-150"
+						onClick={startDevServer}
+					>
+						Run
+					</button>
+
+					{/* URL */}
+					<p className="text-xs font-mono text-gray-700 text-center my-5">
+						{url ? url : "NO URL"}
+					</p>
+
+					<h2 className="font-bold text-lg mb-4 border-b pb-2">
+						Files
+					</h2>
+					{files.map((file) => (
+						<p
+							key={file}
+							onClick={() => handleClick(file)}
+							className="cursor-pointer font-mono pl-2 hover:underline"
 						>
-							Run
-						</button>
-						<p className="text-xs mb-4">
-							{url === "" ? "NO URL" : `${url}`}
+							{file}
 						</p>
-					</div>
-					<div>
-						<h1 className="font-bold mb-2 text-2xl border-0 border-b-2">
-							Files
-						</h1>
-						{files.map((file) => (
-							<p
-								key={file}
-								onClick={() => handleClick(file)}
-								className="font-mono font-bold cursor-pointer pl-5"
-							>
-								{file}
-							</p>
-						))}
-					</div>
+					))}
 				</div>
 
-				{/* Editor */}
-				<div className="flex-1 bg-white">
+				{/* Editor - 40% */}
+				<div className="w-[40%] bg-white">
 					<Editor
-						height="75vh"
+						height="100%"
 						width="100%"
 						theme="vs-dark"
 						defaultLanguage="javascript"
@@ -191,14 +181,72 @@ export default function App() {
 						onChange={(value) => setCode(value)}
 					/>
 				</div>
+
+				{/* Terminal - 40% */}
+				<div className="w-[40%] border-l bg-black text-white">
+					<div
+						ref={terminalRef}
+						className="w-full h-full p-2 overflow-auto"
+					/>
+				</div>
 			</div>
 
-			{/* Terminal */}
-			<div className="h-[300px] border-t border-gray-300">
-				<div
-					ref={terminalRef}
-					className="w-full h-full bg-black text-white"
-				/>
+			<div className="flex justify-between items-center px-4 py-2 border-b bg-gray-50"></div>
+
+			{/* Bottom Row: Inputs + Output */}
+			<div className="flex font-mono">
+				{/* Left: Request Config - 60% */}
+				<div className="w-3/5 p-4 space-y-4">
+					<div className="flex items-center space-x-4">
+						<label className="font-bold">METHOD</label>
+						<select
+							value={method}
+							onChange={(e) => setMethod(e.target.value)}
+							className="border pl-2 pr-6 py-1 uppercase"
+						>
+							<option value="GET">GET</option>
+							<option value="POST">POST</option>
+							<option value="PUT">PUT</option>
+							<option value="DELETE">DELETE</option>
+						</select>
+
+						<label className="font-bold">HEADERS</label>
+						<input
+							type="text"
+							placeholder="Content-Type: application/json"
+							className="border pl-2 py-1 w-96"
+							value={header}
+							onChange={(e) => setHeader(e.target.value)}
+						/>
+					</div>
+
+					<div>
+						<label className="block font-bold mb-1">
+							JSON BODY
+						</label>
+						<textarea
+							className="w-2/5 border p-2 font-mono resize-y min-h-[100px]"
+							placeholder={`{\n  "key": "value"\n}`}
+							value={data}
+							onChange={(e) => setData(e.target.value)}
+						/>
+					</div>
+
+					<button
+						className="px-6 py-2 bg-black text-white rounded-lg mt-2 cursor-pointer active:opacity-70 active:scale-95 transition duration-150"
+						onClick={curlAutomate}
+					>
+						runCurl
+					</button>
+				</div>
+
+				{/* Right: Output Viewer - 40% */}
+				<div className="w-2/5 p-4 bg-gray-50 border-l overflow-auto">
+					<h3 className="font-bold mb-2">Response Headers</h3>
+					<p className="font-mono text-sm whitespace-pre-wrap">
+						{resp}
+					</p>
+				</div>
 			</div>
 		</div>
 	);
