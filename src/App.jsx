@@ -24,7 +24,9 @@ export default function App() {
 	const [method, setMethod] = useState("GET");
 	const [header, setHeader] = useState("");
 	const [data, setData] = useState("");
+	const [path, setPath] = useState("/");
 	const [resp, setResp] = useState("");
+	const [currentFile, setCurrentFile] = useState("index.js");
 
 	const bootWC = useCallback(async () => {
 		const webcontainer = await WebContainer.boot({
@@ -37,6 +39,7 @@ export default function App() {
 
 		// for url
 		webcontainer.on("server-ready", (port, url) => {
+			// setUrl(`http://localhost:${port}`);
 			setUrl(url);
 		});
 
@@ -87,6 +90,8 @@ export default function App() {
 			);
 			// console.log("here it is", fileContent);
 			setCode(fileContent);
+			setCurrentFile(file);
+			console.log("current-working file, ", currentFile);
 		} catch (e) {
 			console.error("Error reading the file: ", e);
 		}
@@ -107,16 +112,80 @@ export default function App() {
 	const curlAutomate = async () => {
 		// accepted method
 		// GET POST PUT DELETE
-		const process = await webcontainerInstance.spawn("curl", [`${url}`]);
+		let commandArgs = [];
+		const content_header = header || "Content-Type: application/json";
+
+		switch (method) {
+			case "GET":
+				commandArgs = [`${url}${path}`];
+				break;
+
+			case "POST":
+			case "PUT":
+				if (!content_header || !data) {
+					setResp(
+						"Error header and data are required for post/put request.",
+					);
+					return;
+				}
+				commandArgs = [
+					"-X",
+					method,
+					"-H",
+					content_header,
+					"-d",
+					data,
+					`${url}${path}`,
+				];
+				break;
+
+			case "DELETE":
+				commandArgs = [
+					"-X",
+					method,
+					"-H",
+					content_header,
+					`${url}${path}`,
+				];
+				break;
+
+			default:
+				setResp("Method not supported, currently!");
+				return;
+		}
+
+		// const process = await webcontainerInstance.spawn("curl", [`${url}`]);
+		const process = await webcontainerInstance.spawn("curl", commandArgs);
 
 		// pipe curl to console
 		await process.output.pipeTo(
 			new WritableStream({
 				write(chunk) {
-					setResp(chunk);
+					setResp((prev) => prev + chunk);
 				},
 			}),
 		);
+	};
+
+	// save editor content-to-currentFile
+	const saveToFile = async () => {
+		if (code === "") {
+			console.log("Code is empty");
+			return;
+		}
+
+		if (webcontainerInstance && currentFile) {
+			try {
+				await webcontainerInstance.fs.writeFile(
+					`/${currentFile}`,
+					code,
+					"utf-8",
+				);
+				console.log(`File ${currentFile} updated Successfully!`);
+			} catch (e) {
+				console.error("Error saving the file: ", e);
+			}
+		}
 	};
 
 	// for booting-up webcontainer
@@ -148,6 +217,12 @@ export default function App() {
 						onClick={startDevServer}
 					>
 						Run
+					</button>
+					<button
+						onClick={saveToFile}
+						className="mt-3 px-6 py-2 bg-black text-white rounded-lg cursor-pointer active:opacity-70 active:scale-95 transition duration-150"
+					>
+						SaveFile
 					</button>
 
 					{/* URL */}
@@ -196,7 +271,7 @@ export default function App() {
 			{/* Bottom Row: Inputs + Output */}
 			<div className="flex font-mono">
 				{/* Left: Request Config - 60% */}
-				<div className="w-3/5 p-4 space-y-4">
+				<div className="w-3/5 p-4 space-y-4 ml-5">
 					<div className="flex items-center space-x-4">
 						<label className="font-bold">METHOD</label>
 						<select
@@ -220,7 +295,15 @@ export default function App() {
 						/>
 					</div>
 
-					<div>
+					<div className="flex items-start space-x-4">
+						<label className="font-bold">Path</label>
+						<input
+							type="text"
+							placeholder="path: /api/rate"
+							className="border pl-2 py-1 w-60"
+							onChange={(e) => setPath(e.target.value)}
+						/>
+
 						<label className="block font-bold mb-1">
 							JSON BODY
 						</label>
@@ -241,7 +324,7 @@ export default function App() {
 				</div>
 
 				{/* Right: Output Viewer - 40% */}
-				<div className="w-2/5 p-4 bg-gray-50 border-l overflow-auto">
+				<div className="w-2/5 p-4 bg-gray-50 border-l overflow-auto max-h-[300px]">
 					<h3 className="font-bold mb-2">Response Headers</h3>
 					<p className="font-mono text-sm whitespace-pre-wrap">
 						{resp}
