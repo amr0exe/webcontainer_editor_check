@@ -20,9 +20,6 @@ export const Inbrowser = () => {
 		<div className="w-[40%] border-l flex flex-col">
 			{/* URL Bar */}
 			<div className="w-[80%] h-8 rounded-md border border-gray-400 bg-gray-100 flex items-center px-3 mx-auto mt-2 overflow-hidden">
-				{/* <p className="whitespace-nowrap overflow-x-auto text-sm text-gray-700">
-				{url}
-			</p> */}
 				{isEditing ? (
 					<input
 						type="text"

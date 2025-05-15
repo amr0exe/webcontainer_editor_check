@@ -98,16 +98,16 @@ export default function App() {
 		});
 	}, [setUrl, iframeRef, setWebcontainerInstance]);
 
-	const handleClick = async (file) => {
+	const handleClick = async (filePath) => {
 		try {
 			const fileContent = await webcontainerInstance.fs.readFile(
-				`/${file}`,
+				filePath,
 				"utf-8",
 			);
 			// console.log("here it is", fileContent);
 			setCode(fileContent);
-			setCurrentFile(file);
-			console.log("current-working file, ", currentFile);
+			setCurrentFile(filePath);
+			console.log("current-working file, ", filePath);
 		} catch (e) {
 			console.error("Error reading the file: ", e);
 		}
@@ -148,7 +148,7 @@ export default function App() {
 		if (webcontainerInstance && currentFile) {
 			try {
 				await webcontainerInstance.fs.writeFile(
-					`/${currentFile}`,
+					currentFile,
 					code,
 					"utf-8",
 				);
@@ -158,6 +158,108 @@ export default function App() {
 			}
 		}
 	};
+
+	const readDirectoryTree = useCallback(
+		async (path = "/") => {
+			const items = await webcontainerInstance.fs.readdir(path, {
+				withFileTypes: true,
+			});
+			const tree = [];
+			// console.log("Before items: ", items);
+
+			for (const item of items) {
+				const fullPath = `${path}${item.name}${item._type === 2 ? "/" : ""}`;
+				if (item._type === 2) {
+					tree.push({
+						name: item.name,
+						path: fullPath,
+						type: "directory",
+						children: await readDirectoryTree(fullPath),
+					});
+				} else {
+					tree.push({
+						name: item.name,
+						path: fullPath,
+						type: "file",
+					});
+				}
+			}
+
+			// console.log(tree);
+			return tree;
+		},
+		[webcontainerInstance],
+	);
+
+	const isDir = useCallback(
+		async (path) => {
+			try {
+				const entries = await webcontainerInstance.fs.readdir(path, {
+					withFileTypes: true,
+				});
+				return Array.isArray(entries);
+			} catch (err) {
+				return false;
+			}
+		},
+		[webcontainerInstance],
+	);
+
+	const setupRecursiveWatchers = useCallback(
+		async (path = "/") => {
+			const watchers = [];
+
+			// file guard
+			if (!(await isDir(path))) {
+				console.log("its a file");
+				return [];
+			}
+
+			const items = await webcontainerInstance.fs.readdir(path, {
+				withFileTypes: true,
+			});
+
+			// Watch current directory
+			const watcher = await webcontainerInstance.fs.watch(
+				path,
+				async (e, f) => {
+					console.log(`Watched event: ${e} on file: ${f}`);
+					const tree = await readDirectoryTree("/");
+					setFiles(tree);
+
+					// If a new directory is created, watch it
+					if (e === "rename") {
+						const fullPath = `${path}${f}`;
+						console.log("fullPath: ", fullPath);
+
+						if (await isDir(fullPath)) {
+							const newWatchers = await setupRecursiveWatchers(
+								`${fullPath}/`,
+							);
+							watchers.push(...newWatchers);
+						}
+					}
+				},
+			);
+
+			watchers.push(watcher);
+
+			// Recurse into subdirectories
+			for (const item of items) {
+				if (item._type === 2) {
+					console.log(`${path}${item.name}`);
+					// directory
+					const subWatchers = await setupRecursiveWatchers(
+						`${path}${item.name}/`,
+					);
+					watchers.push(...subWatchers);
+				}
+			}
+
+			return watchers;
+		},
+		[readDirectoryTree, webcontainerInstance, isDir],
+	);
 
 	// for booting-up webcontainer
 	useEffect(() => {
@@ -169,13 +271,44 @@ export default function App() {
 	useEffect(() => {
 		if (!webcontainerInstance) return;
 
-		const interval = setInterval(async () => {
-			const fileList = await webcontainerInstance.fs.readdir("/");
-			setFiles(fileList);
-		}, 2000);
+		// initial VFS load
+		const fetchTree = async () => {
+			const tree = await readDirectoryTree("/");
+			setFiles(tree);
+		};
+		fetchTree();
 
-		return () => clearInterval(interval);
-	}, [webcontainerInstance]);
+		// // watch the VFS
+		// const setUpTerm = async () => {
+		// 	const watcher = await webcontainerInstance.fs.watch(
+		// 		"/",
+		// 		async (e, p) => {
+		// 			console.log(
+		// 				`WAtched watched!!!! event: ${e} on path: ${p}`,
+		// 			);
+
+		// 			const tree = await readDirectoryTree("/");
+		// 			setFiles(tree);
+		// 		},
+		// 	);
+
+		// 	return () => {
+		// 		watcher.close();
+		// 	};
+		// };
+		// setUpTerm();
+
+		let watchers = [];
+		const setupWatchers = async () => {
+			watchers = await setupRecursiveWatchers("/");
+		};
+
+		setupWatchers();
+
+		return () => {
+			watchers.forEach((w) => w.close());
+		};
+	}, [webcontainerInstance, readDirectoryTree, setupRecursiveWatchers]);
 
 	return (
 		<div className="flex flex-col">
