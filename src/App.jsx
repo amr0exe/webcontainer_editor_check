@@ -25,6 +25,7 @@ import { Inbrowser } from "./components/Inbrowser.jsx";
 export default function App() {
 	const terminalRef = useRef(null);
 	const bootedRef = useRef(false);
+	const bootingRef = useRef(false);
 
 	const [files, setFiles] = useState([]);
 	const [code, setCode] = useState("");
@@ -41,11 +42,19 @@ export default function App() {
 	} = useContext(MyContext);
 
 	const bootWC = useCallback(async () => {
+		if (bootedRef.current || bootingRef.current || webcontainerInstance) {
+			console.log("container hit again to boot...");
+			return;
+		}
+
+		bootingRef.current = true;
+
 		const webcontainer = await WebContainer.boot({
 			coep: "credentialless",
 		});
 		setWebcontainerInstance(webcontainer);
 		bootedRef.current = true;
+		bootingRef.current = false;
 
 		await webcontainer.mount(mnt_file);
 
@@ -96,7 +105,13 @@ export default function App() {
 				rows: term.rows,
 			});
 		});
-	}, [setUrl, iframeRef, setWebcontainerInstance]);
+	}, [
+		setUrl,
+		iframeRef,
+		setWebcontainerInstance,
+		bootingRef,
+		webcontainerInstance,
+	]);
 
 	const handleClick = async (filePath) => {
 		try {
@@ -269,9 +284,9 @@ export default function App() {
 
 	// for booting-up webcontainer
 	useEffect(() => {
-		if (bootedRef.current) return;
+		if (bootedRef.current || webcontainerInstance) return;
 		bootWC();
-	}, [bootWC]);
+	}, [bootWC, webcontainerInstance]);
 
 	// for fetching-files from VFS
 	useEffect(() => {
