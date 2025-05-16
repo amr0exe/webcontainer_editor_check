@@ -214,6 +214,12 @@ export default function App() {
 				console.log("its a file");
 				return [];
 			}
+			console.log("path here: ", path);
+
+			if (path.includes("node_modules")) {
+				console.log("its a node_modules folder...");
+				return [];
+			}
 
 			const items = await webcontainerInstance.fs.readdir(path, {
 				withFileTypes: true,
