@@ -179,27 +179,58 @@ export default function App() {
 			const items = await webcontainerInstance.fs.readdir(path, {
 				withFileTypes: true,
 			});
-			const tree = [];
-			// console.log("Before items: ", items);
+			// const tree = [];
+			// // console.log("Before items: ", items);
 
-			for (const item of items) {
-				const fullPath = `${path}${item.name}${item._type === 2 ? "/" : ""}`;
-				if (item._type === 2) {
-					tree.push({
-						name: item.name,
-						path: fullPath,
-						type: "directory",
-						children: await readDirectoryTree(fullPath),
-					});
-				} else {
-					tree.push({
-						name: item.name,
-						path: fullPath,
-						type: "file",
-					});
-				}
-			}
+			// for (const item of items) {
+			// 	const fullPath = `${path}${item.name}${item._type === 2 ? "/" : ""}`;
+			// 	if (item._type === 2) {
+			// 		tree.push({
+			// 			name: item.name,
+			// 			path: fullPath,
+			// 			type: "directory",
+			// 			children: await readDirectoryTree(fullPath),
+			// 		});
+			// 	} else {
+			// 		tree.push({
+			// 			name: item.name,
+			// 			path: fullPath,
+			// 			type: "file",
+			// 		});
+			// 	}
+			// }
 
+			const tree = await Promise.all(
+				items.map(async (item) => {
+					const fullPath = `${path}${item.name}${item._type === 2 ? "/" : ""}`;
+					if (item._type === 2) {
+						if (item.name === "node_modules") {
+							// Mark node_modules as lazy-loaded
+							return {
+								name: item.name,
+								path: fullPath,
+								type: "directory",
+								children: "lazy",
+							};
+						} else {
+							// Recursively fetch children for other directories
+							const children = await readDirectoryTree(fullPath);
+							return {
+								name: item.name,
+								path: fullPath,
+								type: "directory",
+								children,
+							};
+						}
+					} else {
+						return {
+							name: item.name,
+							path: fullPath,
+							type: "file",
+						};
+					}
+				}),
+			);
 			// console.log(tree);
 			return tree;
 		},
@@ -356,7 +387,11 @@ export default function App() {
 							{url ? url : "NO URL"}
 						</p>
 
-						<Filetree files={files} handleClick={handleClick} />
+						<Filetree
+							files={files}
+							handleClick={handleClick}
+							webcontainerInstance={webcontainerInstance}
+						/>
 					</div>
 
 					{/* Editor - 40% */}
