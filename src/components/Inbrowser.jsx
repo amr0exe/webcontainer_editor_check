@@ -43,6 +43,7 @@ export const Inbrowser = () => {
 			{/* Iframe Content */}
 			<iframe
 				ref={iframeRef}
+				allow="cross-origin-isolated"
 				className="w-full flex-grow mt-2"
 				sandbox="allow-scripts allow-same-origin"
 			/>
