@@ -43,9 +43,10 @@ export const Inbrowser = () => {
 			{/* Iframe Content */}
 			<iframe
 				ref={iframeRef}
-				allow="cross-origin-isolated"
+				allow="cross-origin-isolated; microphone; camera"
 				className="w-full flex-grow mt-2"
-				sandbox="allow-scripts allow-same-origin"
+				sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+				credentialless="true"
 			/>
 		</div>
 	);

@@ -51,6 +51,7 @@ export default function App() {
 
 		const webcontainer = await WebContainer.boot({
 			coep: "credentialless",
+			workdirName: 'project'
 		});
 		setWebcontainerInstance(webcontainer);
 		bootedRef.current = true;
