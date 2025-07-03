@@ -63,7 +63,7 @@ export default function App() {
 		webcontainer.on("server-ready", (port, url) => {
 			// setUrl(`http://localhost:${port}`);
 			setUrl(url);
-			iframeRef.current.src = url;
+			//iframeRef.current.src = url;
 		});
 
 		// Terminal setup
