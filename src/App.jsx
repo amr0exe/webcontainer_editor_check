@@ -114,6 +114,30 @@ export default function App() {
 		webcontainerInstance,
 	]);
 
+	// for multi-language highlighting support
+	const getLanguageFromFilename = (filename) => {
+		if (!filename) return "javascript"
+
+		const extension = filename.split('.').pop()?.toLowerCase()
+
+		// currently planned to support languages
+		const languageMap = {
+			'js': 'javascript',
+			'jsx': 'javascript',
+			'ts': 'typescript',
+			'tsx': 'typescript',
+			'json': 'json',
+			'html': 'html',
+			'css': 'css',
+			'md': 'markdown',
+			'markdown': 'markdown'
+		}
+
+		return languageMap[extension] || 'javascript'
+	}
+
+	// on click of fileName, 
+	// loads code on monaco-editor, updates currentFile
 	const handleClick = async (filePath) => {
 		try {
 			const fileContent = await webcontainerInstance.fs.readFile(
@@ -180,6 +204,13 @@ export default function App() {
 			const items = await webcontainerInstance.fs.readdir(path, {
 				withFileTypes: true,
 			});
+
+			/////////////////////////////
+			// DO NOT REMOVE THIS COMMENT
+			////////////////////////////
+			//
+			// previously thoughout idea
+			//
 			// const tree = [];
 			// // console.log("Before items: ", items);
 
@@ -401,7 +432,8 @@ export default function App() {
 							height="100%"
 							width="100%"
 							theme="vs-dark"
-							defaultLanguage="javascript"
+							//defaultLanguage="javascript"
+							language={getLanguageFromFilename(currentFile)}
 							defaultValue="// write code here"
 							value={code}
 							onChange={(value) => setCode(value)}
