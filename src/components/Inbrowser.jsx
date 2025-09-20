@@ -38,7 +38,7 @@ export const Inbrowser = () => {
 	};
 
 	return (
-		<div className="w-[40%] border-l flex flex-col">
+		<div className="w-full h-full border-l flex flex-col">
 			{/* URL Bar */}
 			<div className="w-[80%] h-8 rounded-md border border-gray-400 bg-gray-100 flex items-center px-3 mx-auto mt-2 overflow-hidden">
 				{isEditing ? (

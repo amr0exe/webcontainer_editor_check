@@ -118,7 +118,7 @@ export const Apitest = () => {
 				</div>
 
 				<button
-					className="px-6 py-2 bg-black text-white rounded-lg mt-2 cursor-pointer active:opacity-70 active:scale-95 transition duration-150"
+					className="px-6 py-2 bg-black text-white rounded-lg mt-2 cursor-pointer active:opacity-30 active:scale-125 transition duration-150"
 					onClick={curlAutomate}
 				>
 					runCurl

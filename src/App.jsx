@@ -17,6 +17,11 @@ import {
 	SheetTitle,
 	SheetTrigger,
 } from "@/components/ui/sheet";
+import { 
+	ResizableHandle, 
+	ResizablePanel, 
+	ResizablePanelGroup 
+} from "./components/ui/resizable.jsx";
 
 import { mnt_file } from "./files/file.js";
 import { Apitest } from "./components/Apitest.jsx";
@@ -29,8 +34,9 @@ export default function App() {
 
 	const [files, setFiles] = useState([]);
 	const [code, setCode] = useState("");
-	const [serverProcess, setServerProcess] = useState(null);
-	const [serverRunning, setServerRunning] = useState(false);
+	const [serverProcess, setServerProcess] = useState(null); 	// ref to (npm start) process, for killing it
+	const [serverRunning, setServerRunning] = useState(false); 	// after state after npm start
+	const [onProcess, setOnProcess] = useState(false); 			// middle state during dependencies install
 	const [currentFile, setCurrentFile] = useState("index.js");
 
 	const {
@@ -161,6 +167,7 @@ export default function App() {
 
 			console.log("dev-server stopped...");
 		} else {
+			setOnProcess(true);
 			// install dependencies
 			const installProcess = await webcontainerInstance.spawn("npm", [
 				"install",
@@ -171,6 +178,7 @@ export default function App() {
 			const startProcess = await webcontainerInstance.spawn("npm", [
 				"start",
 			]);
+			setOnProcess(false);
 			setServerProcess(startProcess);
 			setServerRunning(true);
 
@@ -402,14 +410,25 @@ export default function App() {
 					<div className="w-1/5 border-r bg-gray-100 p-4 overflow-auto flex flex-col">
 						{/* Run-the-Program */}
 						<button
-							className="px-6 py-2 bg-black text-white rounded-lg cursor-pointer active:opacity-70 active:scale-95 transition duration-150"
+							className={`px-6 py-2 bg-black text-white rounded-lg transition duration-150 active:scale-125
+										${onProcess ? "opacity-50 cursor-not-allowed blur-[1px]" : "cursor-pointer active:opacity-70"}
+									`}
+							disabled={onProcess}
 							onClick={startDevServer}
 						>
-							{serverRunning ? "Stop-Server" : "Run"}
+							{/* serverRunning is final state after npm install && npm start, initiall [serverRunning=false] */}
+							{!serverRunning ? (
+								// when dependencies are intalling... & after it finishes
+								onProcess ? "installing..." : "Run"
+							) : (
+								// after successfull dependencies installation & server is running
+								// a click now will kill/stop the server
+								"kill_server"
+							)}
 						</button>
 						<button
 							onClick={saveToFile}
-							className="mt-3 px-6 py-2 bg-black text-white rounded-lg cursor-pointer active:opacity-70 active:scale-95 transition duration-150"
+							className="mt-3 px-6 py-2 bg-black text-white rounded-lg cursor-pointer active:opacity-30 active:scale-125 transition duration-150"
 						>
 							SaveFile
 						</button>
@@ -426,36 +445,41 @@ export default function App() {
 						/>
 					</div>
 
-					{/* Editor - 40% */}
-					<div className="w-[40%] bg-white">
-						<Editor
-							height="100%"
-							width="100%"
-							theme="vs-dark"
-							//defaultLanguage="javascript"
-							language={getLanguageFromFilename(currentFile)}
-							defaultValue="// write code here"
-							value={code}
-							onChange={(value) => setCode(value)}
-						/>
-					</div>
 
-					{/* Inbrowser */}
-					<Inbrowser />
+					<ResizablePanelGroup direction="horizontal">
+						<ResizablePanel>
+							{/* Editor - 40% */}
+							<div className="w-full h-full bg-white">
+								<Editor
+									height="100%"
+									width="100%"
+									theme="vs-dark"
+									//defaultLanguage="javascript"
+									language={getLanguageFromFilename(currentFile)}
+									defaultValue="// write code here"
+									value={code}
+									onChange={(value) => setCode(value)}
+								/>
+							</div>
+						</ResizablePanel>
+						<ResizableHandle />
+						<ResizablePanel>
+							{/* Inbrowser */}
+							<Inbrowser />
+						</ResizablePanel>
+					</ResizablePanelGroup>
 				</div>
+			</div>
 
-				<div className="flex justify-between items-center px-4 py-2 border-b bg-gray-50"></div>
-
-				{/* Terminal  */}
-				<div className="w-full border-t bg-black text-white mt-3 ">
-					<div ref={terminalRef} className="p-2 h-[300px]" />
-				</div>
+			{/* Terminal  */}
+			<div className="w-full border-t bg-black text-white mt-3 ">
+				<div ref={terminalRef} className="p-2 h-[300px]" />
 			</div>
 
 			{/* Apitest */}
 			<Sheet>
 				<SheetTrigger asChild>
-					<button className="w-1/3 mt-5 mx-auto px-6 py-6 font-bold text-2xl font-mono bg-black text-white rounded-lg cursor-pointer active:opacity-70 active:scale-95 transition duration-150">
+					<button className="w-1/3 mt-5 mx-auto px-6 py-6 font-bold text-2xl font-mono bg-black text-white rounded-lg cursor-pointer active:opacity-30 active:scale-125 transition duration-150">
 						ApiTest
 					</button>
 				</SheetTrigger>
